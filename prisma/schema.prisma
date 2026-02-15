@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String      @id @default(cuid())
+  email        String      @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  workspaces   Workspace[]
+}
+
+model Workspace {
+  id             String          @id @default(cuid())
+  name           String
+  userId         String
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime        @default(now())
+  boards         Board[]
+  commandLogs    CommandLog[]
+  openclawConfig OpenClawConfig?
+}
+
+model Board {
+  id          String   @id @default(cuid())
+  title       String
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  columns     Column[]
+}
+
+model Column {
+  id      String @id @default(cuid())
+  title   String
+  boardId String
+  board   Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  order   Int
+  tasks   Task[]
+}
+
+model Task {
+  id             String         @id @default(cuid())
+  title          String
+  description    String?
+  priority       String         @default("medium") // low | medium | high
+  labels         String         @default("[]") // JSON string array
+  dueDate        DateTime?
+  assignee       String         @default("me") // me | openclaw_bot
+  columnId       String
+  column         Column         @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  order          Int
+  openclawJobId  String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  activities     TaskActivity[]
+  openclawJob    OpenClawJob?
+}
+
+model TaskActivity {
+  id        String   @id @default(cuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  action    String
+  details   String?
+  createdAt DateTime @default(now())
+}
+
+model CommandLog {
+  id          String   @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  command     String
+  input       String?
+  output      String?
+  status      String   // success | error | timeout
+  durationMs  Int?
+  createdAt   DateTime @default(now())
+}
+
+model OpenClawConfig {
+  id             String   @id @default(cuid())
+  workspaceId    String   @unique
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  baseUrl        String   @default("")
+  tokenEncrypted String   @default("")
+  mode           String   @default("mock") // mock | real
+  healthPath     String   @default("/health")
+  lastStatus     String?  // connected | disconnected | misconfigured
+  lastLatencyMs  Int?
+  updatedAt      DateTime @updatedAt
+}
+
+model OpenClawJob {
+  id           String   @id @default(cuid())
+  jobId        String   @unique
+  taskId       String   @unique
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  status       String   @default("pending") // pending | running | completed | failed | cancelled
+  lastPayload  String?
+  lastResponse String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
